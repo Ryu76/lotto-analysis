@@ -6,25 +6,57 @@
 </head>
 <body>
 <main class="shell">
-  <header><p class="eyebrow">LOTTO 6/45 · DESCRIPTIVE ANALYSIS</p><h1>최근 로또 번호 분석</h1><p class="intro">공식 공개 결과를 조회 시점에 가져와 최근 50회 통계를 보여줍니다. 번호 추천이나 당첨 예측은 제공하지 않습니다.</p></header>
-  <section class="toolbar"><div><label for="scope">분석 범위</label><select id="scope"><option value="50">최근 50회</option><option value="30">최근 30회</option><option value="10">최근 10회</option></select></div><button id="refresh">공식 결과 조회·분석</button><span id="status" role="status"></span></section>
+  <header>
+    <p class="eyebrow">LOTTO 6/45 · DESCRIPTIVE ANALYSIS</p>
+    <h1>최근 로또 번호 분석</h1>
+    <p class="intro">공식 공개 결과를 조회 시점에 가져와 최근 50회 통계를 보여줍니다. 추천은 과거 분포를 활용한 조합 생성일 뿐, 당첨을 예측하지 않습니다.</p>
+  </header>
+
+  <section class="toolbar">
+    <div><label for="scope">분석 범위</label><select id="scope"><option value="50">최근 50회</option><option value="30">최근 30회</option><option value="10">최근 10회</option></select></div>
+    <button id="refresh">공식 결과 조회·분석</button><span id="status" role="status"></span>
+  </section>
   <section id="summary" class="summary hidden"></section>
   <section id="content" class="hidden">
     <div class="grid stats-grid" id="metrics"></div>
     <div class="grid cards"><article class="panel"><h2>많이 출현한 번호</h2><div id="top"></div></article><article class="panel"><h2>적게 출현한 번호</h2><div id="low"></div></article><article class="panel"><h2>장기간 미출현 번호</h2><div id="overdue"></div></article></div>
     <article class="panel"><h2>1~45 번호별 출현 현황</h2><p class="note">출현 횟수와 마지막 출현 회차를 표시합니다. 이 표는 미래 당첨을 예측하지 않습니다.</p><div class="frequency" id="frequency"></div></article>
   </section>
+
+  <section class="recommend-panel" aria-labelledby="recommend-title">
+    <div class="section-heading"><div><p class="eyebrow">COMBINATION GENERATOR</p><h2 id="recommend-title">번호 추천</h2></div><span id="recommend-status" role="status"></span></div>
+    <div class="recommend-controls">
+      <fieldset><legend>추천 방식</legend><label><input type="radio" name="method" value="balanced" checked> 균형 추천</label><label><input type="radio" name="method" value="frequency"> 빈도 추천</label><label><input type="radio" name="method" value="random"> 랜덤 추천</label></fieldset>
+      <label class="games-label" for="recommend-count">추천 게임 수<select id="recommend-count"><option value="1">1게임</option><option value="3">3게임</option><option value="5" selected>5게임</option><option value="10">10게임</option></select></label>
+      <button id="recommend">번호 추천</button>
+    </div>
+    <div id="recommendations" class="recommendations" aria-live="polite"></div>
+    <p class="notice">과거 당첨번호 통계를 기반으로 조합을 생성합니다. 각 로또 번호 조합의 실제 당첨 확률은 동일하며 당첨을 보장하지 않습니다.</p>
+  </section>
+
+  <section class="backtest-panel" aria-labelledby="backtest-title">
+    <div class="section-heading"><div><p class="eyebrow">WALK-FORWARD CHECK</p><h2 id="backtest-title">추천 알고리즘 백테스트</h2></div><button id="backtest">백테스트 실행</button></div>
+    <p class="note">각 대상 회차는 그보다 앞선 당첨번호만 사용해 추천한 뒤 실제 번호와 비교합니다. 결과는 자동 실행되지 않으며 알고리즘의 우월성을 뜻하지 않습니다.</p>
+    <span id="backtest-status" role="status"></span><div id="backtest-results" class="backtest-results" aria-live="polite"></div>
+  </section>
 </main>
 <script>
 const el=id=>document.getElementById(id); const esc=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
-function list(items, value){return `<ol>${items.map(x=>`<li><b>${x.number}</b><span>${value(x)}</span></li>`).join('')}</ol>`}
+const methodName={balanced:'균형 추천',frequency:'빈도 추천',random:'랜덤 추천'};
+function list(items,value){return `<ol>${items.map(x=>`<li><b>${x.number}</b><span>${value(x)}</span></li>`).join('')}</ol>`}
 function metric(title,value,detail){return `<article class="metric"><span>${title}</span><strong>${value}</strong><small>${detail}</small></article>`}
 function render(data){
- el('summary').innerHTML=`<strong>${data.latest_round}회</strong>부터 <strong>${data.oldest_round}회</strong>까지 · ${data.draw_count}회 분석 <span>${esc(data.source)} · ${new Date(data.fetched_at).toLocaleString('ko-KR')}</span>`;
- el('metrics').innerHTML=[metric('홀수 / 짝수',`${data.odd_even.odd} / ${data.odd_even.even}`,'모든 당첨번호 6개 기준'),metric('1~22 / 23~45',`${data.low_high.low_1_22} / ${data.low_high.high_23_45}`,'번호 구간 구성'),metric('번호 합계',`${data.sum_stats.average}`,'평균 · 최소 '+data.sum_stats.min+' / 최대 '+data.sum_stats.max),metric('연속번호 포함',`${data.consecutive.draws}회`,data.consecutive.rate_percent+'%'),metric('직전 회차 중복',`${data.previous_overlap.total}개`,data.previous_overlap.pairs+'개 회차 쌍 평균 '+data.previous_overlap.average+'개')].join('');
- el('top').innerHTML=list(data.top_numbers,x=>`${x.count}회 출현 · 최근 ${x.last_round}회`); el('low').innerHTML=list(data.low_numbers,x=>`${x.count}회 출현 · 최근 ${x.last_round??'없음'}회`); el('overdue').innerHTML=list(data.overdue_numbers,x=>x.missing_rounds===null?'분석 범위 내 미출현':`${x.missing_rounds}회 경과 · 최근 ${x.last_round}회`);
- el('frequency').innerHTML=data.frequency.map(x=>`<div class="number"><b>${x.number}</b><span>${x.count}회</span><small>${x.last_round??'미출현'}${x.missing_rounds===null?'':' · '+x.missing_rounds+'회 경과'}</small></div>`).join('');
- el('summary').classList.remove('hidden');el('content').classList.remove('hidden');}
+  el('summary').innerHTML=`<strong>${data.latest_round}회</strong>부터 <strong>${data.oldest_round}회</strong>까지 · ${data.draw_count}회 분석 <span>${esc(data.source)} · ${new Date(data.fetched_at).toLocaleString('ko-KR')}</span>`;
+  el('metrics').innerHTML=[metric('홀수 / 짝수',`${data.odd_even.odd} / ${data.odd_even.even}`,'모든 당첨번호 6개 기준'),metric('1~22 / 23~45',`${data.low_high.low_1_22} / ${data.low_high.high_23_45}`,'번호 구간 구성'),metric('번호 합계',`${data.sum_stats.average}`,'평균 · 최소 '+data.sum_stats.min+' / 최대 '+data.sum_stats.max),metric('연속번호 포함',`${data.consecutive.draws}회`,data.consecutive.rate_percent+'%'),metric('직전 회차 중복',`${data.previous_overlap.total}개`,data.previous_overlap.pairs+'개 회차 쌍 평균 '+data.previous_overlap.average+'개')].join('');
+  el('top').innerHTML=list(data.top_numbers,x=>`${x.count}회 출현 · 최근 ${x.last_round}회`); el('low').innerHTML=list(data.low_numbers,x=>`${x.count}회 출현 · 최근 ${x.last_round??'없음'}회`); el('overdue').innerHTML=list(data.overdue_numbers,x=>x.missing_rounds===null?'분석 범위 내 미출현':`${x.missing_rounds}회 경과 · 최근 ${x.last_round}회`);
+  el('frequency').innerHTML=data.frequency.map(x=>`<div class="number"><b>${x.number}</b><span>${x.count}회</span><small>${x.last_round??'미출현'}${x.missing_rounds===null?'':' · '+x.missing_rounds+'회 경과'}</small></div>`).join('');
+  el('summary').classList.remove('hidden');el('content').classList.remove('hidden');
+}
 async function refresh(){const button=el('refresh'),status=el('status');button.disabled=true;status.textContent='공식 결과를 조회하고 있습니다…';try{const response=await fetch('/api/stats?count='+el('scope').value,{cache:'no-store'});const data=await response.json();if(!response.ok)throw new Error(data.detail||'조회에 실패했습니다.');render(data);status.textContent='분석을 완료했습니다.'}catch(error){status.textContent=error.message}finally{button.disabled=false}}
-el('refresh').addEventListener('click',refresh);refresh();
+function balls(numbers){return numbers.map(number=>`<b class="ball">${String(number).padStart(2,'0')}</b>`).join('')}
+function renderRecommendations(data){el('recommendations').innerHTML=data.recommendations.map((item,index)=>`<article class="recommendation"><strong>${String.fromCharCode(65+index)}</strong><div class="balls">${balls(item.numbers)}</div><small>합계 ${item.sum} · 홀 ${item.odd}/짝 ${item.even} · 저 ${item.low}/고 ${item.high}${item.consecutive?' · 연속번호 포함':''}</small></article>`).join('')}
+async function recommend(){const button=el('recommend'),status=el('recommend-status'),method=document.querySelector('input[name="method"]:checked').value,count=Number(el('recommend-count').value);button.disabled=true;status.textContent='조합을 생성하고 있습니다…';try{const response=await fetch('/api/recommend',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({method,count})});const data=await response.json();if(!response.ok)throw new Error(data.detail||'추천 생성에 실패했습니다.');renderRecommendations(data);status.textContent=`${methodName[data.method]} ${data.count}게임 생성 완료`;}catch(error){status.textContent=error.message}finally{button.disabled=false}}
+function renderBacktest(data){const rows=[['평균 일치',x=>x.average_match],['1개 이상',x=>x.match_1_plus],['2개 이상',x=>x.match_2_plus],['3개 이상',x=>x.match_3_plus],['4개 이상',x=>x.match_4_plus],['5개 이상',x=>x.match_5_plus],['6개 일치',x=>x.match_6_plus]];el('backtest-results').innerHTML=`<p class="backtest-meta">${data.tested_draws}개 대상 회차 · 회차당 ${data.games_per_draw}게임 · ${data.iterations}회 반복</p><div class="table-wrap"><table><thead><tr><th>항목</th><th>균형</th><th>빈도</th><th>랜덤</th></tr></thead><tbody>${rows.map(([label,value])=>`<tr><th>${label}</th><td>${value(data.balanced)}</td><td>${value(data.frequency)}</td><td>${value(data.random)}</td></tr>`).join('')}</tbody></table></div><p class="notice">${esc(data.notice)}</p>`}
+async function backtest(){const button=el('backtest'),status=el('backtest-status');button.disabled=true;status.textContent='공식 최근 50회를 기준으로 백테스트를 계산하고 있습니다…';try{const response=await fetch('/api/backtest',{cache:'no-store'});const data=await response.json();if(!response.ok)throw new Error(data.detail||'백테스트에 실패했습니다.');renderBacktest(data);status.textContent='백테스트를 완료했습니다.'}catch(error){status.textContent=error.message}finally{button.disabled=false}}
+el('refresh').addEventListener('click',refresh);el('recommend').addEventListener('click',recommend);el('backtest').addEventListener('click',backtest);refresh();
 </script></body></html>
