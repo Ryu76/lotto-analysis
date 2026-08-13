@@ -1,0 +1,8 @@
+# Runtime and test artefacts
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+# This project does not persist lottery draw data.
+lotto.db
+.env

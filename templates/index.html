@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>최근 로또 번호 분석</title><link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<main class="shell">
+  <header><p class="eyebrow">LOTTO 6/45 · DESCRIPTIVE ANALYSIS</p><h1>최근 로또 번호 분석</h1><p class="intro">공식 공개 결과를 조회 시점에 가져와 최근 50회 통계를 보여줍니다. 번호 추천이나 당첨 예측은 제공하지 않습니다.</p></header>
+  <section class="toolbar"><div><label for="scope">분석 범위</label><select id="scope"><option value="50">최근 50회</option><option value="30">최근 30회</option><option value="10">최근 10회</option></select></div><button id="refresh">공식 결과 조회·분석</button><span id="status" role="status"></span></section>
+  <section id="summary" class="summary hidden"></section>
+  <section id="content" class="hidden">
+    <div class="grid stats-grid" id="metrics"></div>
+    <div class="grid cards"><article class="panel"><h2>많이 출현한 번호</h2><div id="top"></div></article><article class="panel"><h2>적게 출현한 번호</h2><div id="low"></div></article><article class="panel"><h2>장기간 미출현 번호</h2><div id="overdue"></div></article></div>
+    <article class="panel"><h2>1~45 번호별 출현 현황</h2><p class="note">출현 횟수와 마지막 출현 회차를 표시합니다. 이 표는 미래 당첨을 예측하지 않습니다.</p><div class="frequency" id="frequency"></div></article>
+  </section>
+</main>
+<script>
+const el=id=>document.getElementById(id); const esc=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+function list(items, value){return `<ol>${items.map(x=>`<li><b>${x.number}</b><span>${value(x)}</span></li>`).join('')}</ol>`}
+function metric(title,value,detail){return `<article class="metric"><span>${title}</span><strong>${value}</strong><small>${detail}</small></article>`}
+function render(data){
+ el('summary').innerHTML=`<strong>${data.latest_round}회</strong>부터 <strong>${data.oldest_round}회</strong>까지 · ${data.draw_count}회 분석 <span>${esc(data.source)} · ${new Date(data.fetched_at).toLocaleString('ko-KR')}</span>`;
+ el('metrics').innerHTML=[metric('홀수 / 짝수',`${data.odd_even.odd} / ${data.odd_even.even}`,'모든 당첨번호 6개 기준'),metric('1~22 / 23~45',`${data.low_high.low_1_22} / ${data.low_high.high_23_45}`,'번호 구간 구성'),metric('번호 합계',`${data.sum_stats.average}`,'평균 · 최소 '+data.sum_stats.min+' / 최대 '+data.sum_stats.max),metric('연속번호 포함',`${data.consecutive.draws}회`,data.consecutive.rate_percent+'%'),metric('직전 회차 중복',`${data.previous_overlap.total}개`,data.previous_overlap.pairs+'개 회차 쌍 평균 '+data.previous_overlap.average+'개')].join('');
+ el('top').innerHTML=list(data.top_numbers,x=>`${x.count}회 출현 · 최근 ${x.last_round}회`); el('low').innerHTML=list(data.low_numbers,x=>`${x.count}회 출현 · 최근 ${x.last_round??'없음'}회`); el('overdue').innerHTML=list(data.overdue_numbers,x=>x.missing_rounds===null?'분석 범위 내 미출현':`${x.missing_rounds}회 경과 · 최근 ${x.last_round}회`);
+ el('frequency').innerHTML=data.frequency.map(x=>`<div class="number"><b>${x.number}</b><span>${x.count}회</span><small>${x.last_round??'미출현'}${x.missing_rounds===null?'':' · '+x.missing_rounds+'회 경과'}</small></div>`).join('');
+ el('summary').classList.remove('hidden');el('content').classList.remove('hidden');}
+async function refresh(){const button=el('refresh'),status=el('status');button.disabled=true;status.textContent='공식 결과를 조회하고 있습니다…';try{const response=await fetch('/api/stats?count='+el('scope').value,{cache:'no-store'});const data=await response.json();if(!response.ok)throw new Error(data.detail||'조회에 실패했습니다.');render(data);status.textContent='분석을 완료했습니다.'}catch(error){status.textContent=error.message}finally{button.disabled=false}}
+el('refresh').addEventListener('click',refresh);refresh();
+</script></body></html>
